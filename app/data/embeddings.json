@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "id": "chunk-0",
+    "text": "This is a sample chunk",
+    "embedding": [0.123, 0.456, 0.789]
+  },
+  {
+    "id": "chunk-1",
+    "text": "Another chunk",
+    "embedding": [0.111, 0.222, 0.333]
+  }
+]
