@@ -1,39 +1,34 @@
+// app/api/ingest/route.ts
 import { NextResponse } from "next/server";
-import { extractTextFromPDF } from "../../lib/pdf";
+import fs from "fs";
+import path from "path";
 import { splitText } from "../../utils/text-splitter";
+import { embedText } from "../../lib/cohere";
+
+// CommonJS import
+const pdfParse = require("pdf-parse");
 
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
+    const { fileBuffer } = await req.json();
+    const pdfData = await pdfParse(Buffer.from(fileBuffer));
+    const text = pdfData.text;
 
-    const file = formData.get("file") as File;
+    const chunks: string[] = splitText(text);
+    const embeddings = (await embedText(chunks)) as number[][];
 
-    if (!file) {
-      return NextResponse.json(
-        { error: "No file uploaded" },
-        { status: 400 }
-      );
-    }
+    const filePath = path.join(process.cwd(), "data", "embeddings.json");
+    const data = chunks.map((chunk: string, i: number) => ({
+      id: `chunk-${i}`,
+      text: chunk,
+      embedding: embeddings[i],
+    }));
 
-    const bytes = await file.arrayBuffer();
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 
-    const buffer = Buffer.from(bytes);
-
-    const text = await extractTextFromPDF(buffer);
-
-    const chunks = splitText(text);
-
-    return NextResponse.json({
-      textLength: text.length,
-      chunksCount: chunks.length,
-      chunks,
-    });
+    return NextResponse.json({ success: true, count: chunks.length });
   } catch (error) {
-    console.error(error);
-
-    return NextResponse.json(
-      { error: "Failed to process PDF" },
-      { status: 500 }
-    );
+    console.error("Error in ingest:", error);
+    return NextResponse.json({ error: "Failed to ingest document" }, { status: 500 });
   }
 }
